@@ -109,76 +109,86 @@ def display(values):
 
 ################ HILL-CLIMBING ################
 
-def fill_grid_randomly(values):
-    """Remplit chaque carré 3x3 du Sudoku avec des chiffres au hasard respectant les contraintes de chaque carré."""
-    for rs in ('ABC','DEF','GHI'):
-        for cs in ('123','456','789'):
-            unit = []  # Initialisation d'une liste vide pour le carré 3x3
-            for r in rs:
-                for c in cs:
-                    unit.append(r + c)
 
-            digits_to_place = random.sample(digits, 9) # Préparer une liste des chiffres de 1 à 9 mélangés aléatoirement
+def fill_grid_randomly(grid):
+    before = grid
+    grid_list = list(grid)
+    filled_squares = []
 
-            for square in unit:
-                # Assigner le chiffre à la case si ce n'est pas déjà fait
-                if values[square] == '.' or values[square] == '0':
-                    for digit in digits_to_place:
-                        if all(values[s] != digit for s in unit):
-                            values[square] = digit
-                            digits_to_place.remove(digit)
-                            break
+    for box_row in range(3):
+        for box_col in range(3):
+            available_digits = set("123456789")
+
+            for i in range(3):
+                for j in range(3):
+                    index = (box_row * 3 + i) * 9 + (box_col * 3 + j)
+                    if grid_list[index] in available_digits:
+                        available_digits.remove(grid_list[index])
+
+            available_digits = list(available_digits)
+            random.shuffle(available_digits)
+
+            for i in range(3):
+                for j in range(3):
+                    index = (box_row * 3 + i) * 9 + (box_col * 3 + j)
+                    if grid_list[index] == '0' or grid_list[index] == '.':
+                        if available_digits:
+                            grid_list[index] = available_digits.pop()
+                            filled_squares.append(squares[index])
+
+    result = ''.join(grid_list)
+    #print("before ", before)
+    #print("after  ", result)
+    #print("______________")
+    return result, filled_squares
+
+
+def hill_swap(values, filled_squares):
+    blocks_rows = ['ABC', 'DEF', 'GHI']
+    blocks_columns = ['123', '456', '789']
+    squares_in_block = cross(random.choice(blocks_rows), random.choice(blocks_columns))
+    squares_in_block = [square for square in squares_in_block if square in filled_squares] # avoids swapping the initial squares
+    square1, square2 = random.sample(squares_in_block, 2)
+
+    values[square1], values[square2] = values[square2], values[square1]
     return values
 
+
 def count_conflicts(values):
-    # Compter les conflits dans toutes les lignes, colonnes, et carrés
-    conflicts = 0
-    for unit in unitlist:
-        seen = set()  # Ensemble pour suivre les chiffres déjà vus
-        for square in unit:
-            if values[square] in seen:
-                conflicts += 1
-            else:
-                seen.add(values[square])
-    return conflicts
+    conflict_count = 0
+
+    for square in squares:
+        square_value = values[square]
+        for peer in peers[square]:
+            if values[peer] == square_value:
+                conflict_count += 1
+
+    return conflict_count // 2
 
 
-def hill_climbing(values):
-    values = fill_grid_randomly(values)
-    improvement = True
-    while improvement:
-        improvement = False
-        current_conflicts = count_conflicts(values)
+def hill_climbing(grid):
+    print("______________________")
+    grid, filled_squares = fill_grid_randomly(grid) # filled_squares est une liste qui contient toutes les nouvelles cases qui ont apparu
+    values = grid_values(grid)
+    current_conflicts = count_conflicts(values)
+    max_iterations = 9999
 
-        units = []
-        for rs in ('ABC', 'DEF', 'GHI'):
-            for cs in ('123', '456', '789'):
-                unit = cross(rs, cs)
-                units.append(unit)
+    for i in range(max_iterations):
+        new_values = values.copy()
+        new_values = hill_swap(new_values, filled_squares)
+        new_conflicts = count_conflicts(new_values)
 
-        # Parcourir chaque unité (carré 3x3)
-        for unit in units:
-            for i in range(len(unit)):
-                for j in range(i + 1, len(unit)):
-                    # Essayer d'échanger deux chiffres pour voir si ca réduis les conflits
-                    values[unit[i]], values[unit[j]] = values[unit[j]], values[unit[i]]
-                    new_conflicts = count_conflicts(values)
-                    if new_conflicts < current_conflicts:
-                        # Si l'échange a réduit les conflits, considérer cela comme une amélioration
-                        current_conflicts = new_conflicts
-                        improvement = True
-                    else:
-                        # Si l'échange n'a pas amélioré la situation, annuler
-                        values[unit[i]], values[unit[j]] = values[unit[j]], values[unit[i]]
-
-        if not improvement:
-            break
+        if new_conflicts < current_conflicts:
+            print("remaining conflicts: ", current_conflicts)
+            values, current_conflicts = new_values, new_conflicts
+            if current_conflicts == 0:
+                break
 
     return values
 
 ################ Search ################
 
-def solve(grid): return hill_climbing(parse_grid(grid))
+def solve(grid): return hill_climbing(grid)
 
 def search(values):
     "Using depth-first search and propagation, try all possible values."
@@ -260,7 +270,8 @@ hard1  = '.....6....59.....82....8....45........3........6..3.54...325..6.......
 
 if __name__ == '__main__':
     test()
-    solve_all(from_file("100sudoku.txt"), "100sudoku", None)
+    new_grid, filled_squares = fill_grid_randomly(grid1)
+    solve_all(from_file("1000sudoku.txt"), "1000sudoku", None)
 
 ## References used:
 ## http://www.scanraid.com/BasicStrategies.htm

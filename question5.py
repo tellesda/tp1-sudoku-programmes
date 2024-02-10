@@ -1,4 +1,6 @@
 ## Solve Every Sudoku Puzzle
+import math
+
 
 ## See http://norvig.com/sudoku.html
 
@@ -107,37 +109,99 @@ def display(values):
                       for c in cols)
         if r in 'CF': print(line)
 
+################ HILL-CLIMBING ################
+
+
+def fill_grid_randomly(grid):
+    before = grid
+    grid_list = list(grid)
+    filled_squares = []
+
+    for box_row in range(3):
+        for box_col in range(3):
+            available_digits = set("123456789")
+
+            for i in range(3):
+                for j in range(3):
+                    index = (box_row * 3 + i) * 9 + (box_col * 3 + j)
+                    if grid_list[index] in available_digits:
+                        available_digits.remove(grid_list[index])
+
+            available_digits = list(available_digits)
+            random.shuffle(available_digits)
+
+            for i in range(3):
+                for j in range(3):
+                    index = (box_row * 3 + i) * 9 + (box_col * 3 + j)
+                    if grid_list[index] == '0' or grid_list[index] == '.':
+                        if available_digits:
+                            grid_list[index] = available_digits.pop()
+                            filled_squares.append(squares[index])
+
+    result = ''.join(grid_list)
+    #print("before ", before)
+    #print("after  ", result)
+    #print("______________")
+    return result, filled_squares
+
+
+def hill_swap(values, filled_squares):
+    blocks_rows = ['ABC', 'DEF', 'GHI']
+    blocks_columns = ['123', '456', '789']
+    squares_in_block = cross(random.choice(blocks_rows), random.choice(blocks_columns))
+    squares_in_block = [square for square in squares_in_block if square in filled_squares] # avoids swapping the initial squares
+    square1, square2 = random.sample(squares_in_block, 2)
+
+    values[square1], values[square2] = values[square2], values[square1]
+    return values
+
+
+def count_conflicts(values):
+    conflict_count = 0
+
+    for square in squares:
+        square_value = values[square]
+        for peer in peers[square]:
+            if values[peer] == square_value:
+                conflict_count += 1
+
+    return conflict_count // 2
+
+
+def hill_climbing(grid):
+    print("______________________")
+    grid, filled_squares = fill_grid_randomly(grid)
+    values = grid_values(grid)
+    current_conflicts = count_conflicts(values)
+    max_iterations = 9999
+    temperature = 3
+    alpha = 0.99
+
+    for i in range(max_iterations):
+        temperature *= alpha
+        new_values = values.copy()
+        new_values = hill_swap(new_values, filled_squares)
+        new_conflicts = count_conflicts(new_values)
+
+        delta_conflicts = new_conflicts - current_conflicts
+
+        if delta_conflicts < 0:
+            values, current_conflicts = new_values, new_conflicts
+            print("remaining conflicts: ", current_conflicts)
+        else:
+            acceptance_probability = math.exp(-delta_conflicts / temperature)
+            if random.random() < acceptance_probability:
+                values, current_conflicts = new_values, new_conflicts
+
+        if current_conflicts == 0:
+            print("SOLVED")
+            break
+
+    return values
+
 ################ Search ################
 
-def solve(grid): return search(parse_grid(grid))
-
-
-def hidden_pairs(values):
-
-    for unit in unitlist:
-
-        occurence_map = {}  # Dictionnaire pour compter les occurrences
-        for square in unit:
-            for digit in values[square]:
-                if digit not in occurence_map:
-                    occurence_map[digit] = [square]
-                else:
-                    occurence_map[digit].append(square)
-
-        for digit, squares in occurence_map.items():
-            if len(squares) == 2:
-                for other_digit, other_squares in occurence_map.items():
-                    if other_digit != digit and squares == other_squares:
-                        # Une paire cachée est trouvée, supprimer les autres chiffres de ces deux cases
-                        for square in squares:
-                            filtered_digits = []
-
-                            for d in values[square]:
-                                if d in [digit, other_digit]:
-                                    filtered_digits.append(d)
-
-                            values[square] = ''.join(filtered_digits)
-    return values
+def solve(grid): return hill_climbing(grid)
 
 def search(values):
     "Using depth-first search and propagation, try all possible values."
@@ -145,8 +209,6 @@ def search(values):
         return False ## Failed earlier
     if all(len(values[s]) == 1 for s in squares):
         return values ## Solved!
-
-    values = hidden_pairs(values) # Appliquer hidden pairs
 
     ## Chose the unfilled square s with the fewest possibilities
     n,s = min((len(values[s]), s) for s in squares if len(values[s]) > 1)
@@ -221,12 +283,8 @@ hard1  = '.....6....59.....82....8....45........3........6..3.54...325..6.......
 
 if __name__ == '__main__':
     test()
+    new_grid, filled_squares = fill_grid_randomly(grid1)
     solve_all(from_file("100sudoku.txt"), "100sudoku", None)
-    # solve_all(from_file("easy50.txt", '========'), "easy", None)
-    # solve_all(from_file("easy50.txt", '========'), "easy", None)
-    # solve_all(from_file("top95.txt"), "hard", None)
-    # solve_all(from_file("hardest.txt"), "hardest", None)
-    # solve_all([random_puzzle() for _ in range(99)], "random", 100.0)
 
 ## References used:
 ## http://www.scanraid.com/BasicStrategies.htm
