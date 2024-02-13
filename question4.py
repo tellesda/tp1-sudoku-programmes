@@ -271,7 +271,7 @@ hard1  = '.....6....59.....82....8....45........3........6..3.54...325..6.......
 if __name__ == '__main__':
     test()
     new_grid, filled_squares = fill_grid_randomly(grid1)
-    solve_all(from_file("1000sudoku.txt"), "1000sudoku", None)
+    solve_all(from_file("100sudoku.txt"), "100sudoku", None)
 
 ## References used:
 ## http://www.scanraid.com/BasicStrategies.htm
